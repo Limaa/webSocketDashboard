@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "ws": "^3.0.0"
+  },
+  "optionalDependencies": {
+    "bufferutil": "^3.0.1"
+  }
+}
