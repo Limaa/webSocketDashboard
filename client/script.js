@@ -30,7 +30,7 @@
             this.msgAlert.classList.add('alert-danger');
             this.msgAlert.innerHTML = 'Could not connect to WebSocketServer';
 
-            setTimeout(function () {
+            setTimeout(() => {
                 ee.emitEvent('changeFsmState', [st.DISCONNECTED]);
             }, 3000);
         }
@@ -62,34 +62,34 @@
 
             this.ws = undefined;
 
-            this._registerEvents();
-        }
-
+            this._registerEvents();        }
         _registerEvents() {
-            this.btnConnect.addEventListener('click', function () {
+            this.btnConnect.addEventListener('click', () => {
                 ee.emitEvent('changeFsmState', [st.CONNECTING]);
             });
 
-            this.btnDisconnect.addEventListener('click', function () {
+            this.btnDisconnect.addEventListener('click', () => {
+                this.ws.close();
+                this.ws = undefined;
                 ee.emitEvent('changeFsmState', [st.DISCONNECTED]);
             })
         }
 
         _registerWsEvents() {
-            this.ws.onopen = function (event) {
+            this.ws.onopen = (event) => {
                 console.log('Connetion with WebSocketServer opened');
                 ee.emitEvent('changeFsmState', [st.CONNECTED])
             }
 
-            this.ws.onmessage = function (event) {
+            this.ws.onmessage = (event) => {
                 console.log('MESSAGE RECEIVED');
                 console.log(event.data);
             }
 
-            this.ws.onerror = function (event) {
+            this.ws.onerror = (event) => {
             }
 
-            this.ws.onclose = function (event) {
+            this.ws.onclose = (event) => {
                 console.log('Connection with WebSocketServer closed');
                 if (event.code != 1000) {
                     console.log('Could not connect to WebSocketServer');
@@ -116,7 +116,10 @@
             this.wsAddress.disabled = false;
             this.wsPort.disabled = false;
 
-            if (this.ws) this.ws = undefined;
+            if (this.ws) {
+                this.ws.close();
+                this.ws = undefined;
+            }
         }
 
         _connectingState() {
@@ -170,19 +173,6 @@
         }
     }
 
-    class GuiMgr {
-
-        constructor() {
-            this.alertMgr = new AlertMgr();
-            this.wssMgr = new WebSocketServerMgr();
-        }
-
-        changeFsmState(state) {
-            this.wssMgr.changeFsmState(state);
-            this.alertMgr.changeFsmState(state);
-        }
-    }
-
     class MyChart {
         constructor(obj) {
             this.canvasId = obj.canvasId;
@@ -197,7 +187,7 @@
 
         update(label, data) {
             this.chart.data.labels.push(label);
-            this.chart.data.datasets.forEach(function (dataset) {
+            this.chart.data.datasets.forEach((dataset) => {
                 dataset.data.push(data);
             });
             this.chart.update();
@@ -207,7 +197,7 @@
             this.chart.data.labels.push(label);
             this.chart.data.labels.shift();
 
-            this.chart.data.datasets.forEach(function (dataset) {
+            this.chart.data.datasets.forEach((dataset) => {
                 dataset.data.push(data);
                 dataset.data.shift();
             });
@@ -215,10 +205,21 @@
         }
     }
 
+    class GuiMgr {
+        constructor() {
+            this.alertMgr = new AlertMgr();
+            this.wssMgr = new WebSocketServerMgr();
+        }
+
+        changeFsmState(state) {
+            this.wssMgr.changeFsmState(state);
+            this.alertMgr.changeFsmState(state);
+        }
+    }
 
     var guiMgr = new GuiMgr();
-    ee.addListener('changeFsmState', function (state) {
-console.log('mudando de estado para '+state); // TODO: remove this after debug
+    ee.addListener('changeFsmState', (state) => {
+        console.log('mudando de estado para ' + state); // TODO: remove this after debug
         guiMgr.changeFsmState(state);
     });
 
@@ -240,7 +241,7 @@ console.log('mudando de estado para '+state); // TODO: remove this after debug
     var pidChart = new MyChart(obj);
 
     var hor = 0;
-    setInterval(function(){
+    setInterval(() => {
         pidChart.insertData(hor++, hor*hor);
     }, 2000);
 
