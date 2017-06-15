@@ -1,50 +1,58 @@
-const WebSocket = require('ws');
+(() => {
+    "use strict";
 
-const wsPort = 8888;
-const wss = new WebSocket.Server({ port: wsPort });
-console.log('WebSocket started. Listening on port '+wsPort);
-var count = 0;
+    const WebSocket = require('ws');
+    const math = require('mathjs');
 
-function heartbeat() {
-    this.isAlive = true;
-}
+    var count = 0;
+    const wsPort = 8888;
+    const wss = new WebSocket.Server({port: wsPort});
+    console.log('WebSocket started. Listening on port ' + wsPort);
 
-function ping() {
-    wss.clients.forEach(function each(ws, req) {
-        if (ws.isAlive === false) {
-            console.log('No response from ping. Closing connection with %s', req.connection.remoteAddress);
-            return ws.termninate();
-        }
+    wss.on('connection', (ws, req) => {
+        ws.isAlive = true;
+        console.log('Received connection from %s', req.connection.remoteAddress);
 
-        ws.isAlive = false;
-        ws.ping('', false, true);
-    });
-}
+        ws.on('pong', () => {
+            ws.isAlive = true;
+        });
 
-function sendAll() {
-    wss.clients.forEach(function (ws, req) {
-        console.log('sending: '+count);
-        ws.send(count++);
-    });
-}
+        ws.on('message', (message) => {
+            console.log('Message received: %s', message);
+            var reversedMessage = message.split('').reverse().join('');
+            console.log('Sending back: %s', reversedMessage);
+            ws.send(reversedMessage);
+        });
 
-wss.on('connection', function connection(ws, req) {
-    ws.isAlive = true;
-    ws.on('pong', heartbeat);
-
-    console.log('Received connection from %s', req.connection.remoteAddress);
-
-    ws.on('message', function incoming(message) {
-        console.log('Message received: %s', message);
-        var reversedMessage = message.split('').reverse().join('');
-        console.log('Sending back: %s', reversedMessage);
-        ws.send(reversedMessage);
+        ws.on('close', () => {
+            console.log('WebSocket disconnected.');
+        });
     });
 
-    ws.on('close', function () {
-        console.log('disconnected');
-    });
-});
+    function ping() {
+        wss.clients.forEach((ws) => {
+            if (ws.isAlive === false) {
+                console.log('No response from ping. Closing connection.');
+                return ws.terminate();
+            }
+            ws.isAlive = false;
+            ws.ping('', false, true);
+        });
+    }
 
-setInterval(ping, 30000);
-setInterval(sendAll, 1000);
+    function broadcast() {
+        wss.clients.forEach((ws) => {
+            console.log('sending: '+count);
+            var msg = {
+                type: "angle",
+                data: math.sin((count++)/10),
+                id:   'wss',
+                ts: Date.now()
+            };
+            ws.send(JSON.stringify(msg));
+        });
+    }
+
+    setInterval(ping, 10000);
+    setInterval(broadcast, 100);
+})();

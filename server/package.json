@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "mathjs": "^3.13.3",
     "ws": "^3.0.0"
   },
   "optionalDependencies": {

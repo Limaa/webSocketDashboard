@@ -1,6 +1,8 @@
 (function(){
+    "use strict";
 
     const canvasHeight = 60;//120;
+    const graphLabelSize = 100;
 
     const st = {
         DISCONNECTED: 'disconnected',
@@ -72,22 +74,24 @@
                 this.ws.close();
                 this.ws = undefined;
                 ee.emitEvent('changeFsmState', [st.DISCONNECTED]);
-            })
+            });
         }
 
         _registerWsEvents() {
             this.ws.onopen = (event) => {
                 console.log('Connetion with WebSocketServer opened');
                 ee.emitEvent('changeFsmState', [st.CONNECTED])
-            }
+            };
 
             this.ws.onmessage = (event) => {
                 console.log('MESSAGE RECEIVED');
-                console.log(event.data);
-            }
+                var data = JSON.parse(event.data);
+                console.log(data);
+                ee.emitEvent(data.type, [data]);
+            };
 
             this.ws.onerror = (event) => {
-            }
+            };
 
             this.ws.onclose = (event) => {
                 console.log('Connection with WebSocketServer closed');
@@ -99,7 +103,7 @@
                 else {
                     console.log('CLOSED OK');
                 }
-            }
+            };
 
         }
 
@@ -135,10 +139,12 @@
 
             this.wsAddress.disabled = true;
             this.wsPort.disabled = true;
-            if (this.wsAddress.value === '')
+            if (this.wsAddress.value === '') {
                 this.wsAddress.value = '127.0.0.1';
-            if (this.wsPort.value === '')
+            }
+            if (this.wsPort.value === '') {
                 this.wsPort.value = '8888';
+            }
 
             this.ws = new WebSocket('ws://'+this.wsAddress.value+ ':'+this.wsPort.value);
             this._registerWsEvents();
@@ -174,7 +180,22 @@
     }
 
     class MyChart {
-        constructor(obj) {
+        constructor() {
+            var data = {
+                labels : [],
+                datasets : [{
+                    data : []
+                }]
+            };
+            var obj = {
+                canvasId: 'myChart',
+                type: 'line',
+                data: data,
+                options: {
+                    animation: false
+                }
+            };
+
             this.canvasId = obj.canvasId;
             this.ctx = document.getElementById(this.canvasId).getContext('2d');
             this.ctx.canvas.height = canvasHeight;
@@ -195,56 +216,39 @@
 
         insertData(label, data) {
             this.chart.data.labels.push(label);
-            this.chart.data.labels.shift();
+            if (this.chart.data.labels.length > graphLabelSize) {
+                this.chart.data.labels.shift();
+            }
 
             this.chart.data.datasets.forEach((dataset) => {
                 dataset.data.push(data);
-                dataset.data.shift();
+                if (dataset.data.length > graphLabelSize) {
+                    dataset.data.shift();
+                }
             });
             this.chart.update();
         }
     }
 
-    class GuiMgr {
-        constructor() {
-            this.alertMgr = new AlertMgr();
-            this.wssMgr = new WebSocketServerMgr();
-        }
-
-        changeFsmState(state) {
-            this.wssMgr.changeFsmState(state);
-            this.alertMgr.changeFsmState(state);
-        }
-    }
-
-    var guiMgr = new GuiMgr();
+    var alertMgr = new AlertMgr();
+    var wssMgr = new WebSocketServerMgr();
+    var pidChart = new MyChart();
     ee.addListener('changeFsmState', (state) => {
         console.log('mudando de estado para ' + state); // TODO: remove this after debug
-        guiMgr.changeFsmState(state);
+        wssMgr.changeFsmState(state);
+        alertMgr.changeFsmState(state);
     });
-
     ee.emitEvent('changeFsmState', [st.DISCONNECTED]);
-    var data = {
-        labels : ['1','2','3','4','5', '6', '7', '8', '9', '10'],
-        datasets : [{
-            data : [65,59,90,81,56,45,30,20,3,37]
-        }]
-    }
-    var obj = {
-        canvasId: 'myChart',
-        type: 'line',
-        data: data,
-        options: {
-            animation: false
-        }
-    }
-    var pidChart = new MyChart(obj);
 
-    var hor = 0;
-    setInterval(() => {
-        pidChart.insertData(hor++, hor*hor);
-    }, 2000);
-
+    ee.addListener('angle', (event) => {
+        var label = new Date(event.ts).toLocaleTimeString();
+        var data = event.data;
+        console.log('-------------')
+        console.log(label);
+        console.log(data);
+        console.log('-------------')
+        pidChart.insertData(label, data);
+    });
 })();
 
 
