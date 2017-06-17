@@ -179,6 +179,76 @@
         }
     }
 
+    class TerminalMgr {
+        constructor() {
+            this.currentState = 'initial';
+
+            this.terminalMessages = document.getElementById('terminal-messages');
+            this.inputInfo = document.getElementById('terminal-input-info');
+            this.btnSend = document.getElementById('terminal-btn-send');
+        }
+
+        _eraseMessages() {
+            while (this.terminalMessages.firstChild) {
+                this.terminalMessages.removeChild(this.terminalMessages.firstChild);
+            }
+        }
+
+        _insertMessage(event) {
+            var time = document.createElement('p');
+            var timeText = document.createTextNode(new Date(event.ts).toLocaleTimeString());
+            time.classList.add('pull-right');
+            time.appendChild(timeText);
+
+            var msg = document.createElement('p');
+            var msgText = event.id + ':' + event.type + ': ' + event.data;
+            msgText = document.createTextNode(msgText);
+            msg.appendChild(msgText);
+
+            var msgContainer = document.createElement('div');
+            msgContainer.appendChild(time);
+            msgContainer.appendChild(msg);
+
+            this.terminalMessages.appendChild(msgContainer);
+            this.terminalMessages.scrollTop = this.terminalMessages.scrollHeight;
+        }
+
+        _disconnectedState() {
+            this.currentState = st.DISCONNECTED;
+
+            this._eraseMessages();
+            this._insertMessage({
+                type: '',
+                data: 'Disconnected from WebSocketServer',
+                id: '',
+                ts: +Date.now()
+            });
+
+            this.inputInfo.disabled = true;
+            this.btnSend.classList.add('disabled');
+        }
+
+        _connectedState() {
+            this.currentState = st.CONNECTED;
+
+            this._eraseMessages();
+
+            this.inputInfo.disabled = false;
+            this.btnSend.classList.remove('disabled');
+        }
+
+        changeFsmState(state) {
+            switch(state) {
+                case st.DISCONNECTED:
+                    this._disconnectedState();
+                    break;
+                case st.CONNECTED:
+                    this._connectedState();
+                    break;
+            }
+        }
+    }
+
     class MyChart {
         constructor() {
             var data = {
@@ -232,15 +302,19 @@
 
     var alertMgr = new AlertMgr();
     var wssMgr = new WebSocketServerMgr();
+    var terminalMgr = new TerminalMgr();
     var pidChart = new MyChart();
     ee.addListener('changeFsmState', (state) => {
         console.log('mudando de estado para ' + state); // TODO: remove this after debug
         wssMgr.changeFsmState(state);
         alertMgr.changeFsmState(state);
+        terminalMgr.changeFsmState(state);
     });
     ee.emitEvent('changeFsmState', [st.DISCONNECTED]);
 
     ee.addListener('angle', (event) => {
+        terminalMgr._insertMessage(event);
+
         var label = new Date(event.ts).toLocaleTimeString();
         var data = event.data;
         console.log('-------------')
