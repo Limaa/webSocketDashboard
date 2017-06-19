@@ -8,6 +8,7 @@
         DISCONNECTED: 'disconnected',
         CONNECTING: 'connecting',
         CONNECTION_FAILED: 'connectionFailed',
+        DEVICE_DISCONNECTED: 'deviceDisconnected',
         CONNECTED: 'connected'
     };
 
@@ -78,24 +79,30 @@
         }
 
         _registerWsEvents() {
-            this.ws.onopen = (event) => {
+            this.ws.onopen = () => {
                 console.log('Connetion with WebSocketServer opened');
-                ee.emitEvent('changeFsmState', [st.CONNECTED])
+                ee.emitEvent('changeFsmState', [st.DEVICE_DISCONNECTED]);
             };
 
             this.ws.onmessage = (event) => {
                 console.log('MESSAGE RECEIVED');
-                var data = JSON.parse(event.data);
-                console.log(data);
-                ee.emitEvent(data.type, [data]);
+                try {
+                    var data = JSON.parse(event.data);
+                    ee.emitEvent(data.type, [data]);
+                    console.log(data);
+                }
+                catch (e) {
+                    console.log('Error parsing message received');
+                    console.log(event);
+                }
             };
 
-            this.ws.onerror = (event) => {
+            this.ws.onerror = () => {
             };
 
             this.ws.onclose = (event) => {
                 console.log('Connection with WebSocketServer closed');
-                if (event.code != 1000) {
+                if (event.code !== 1000) {
                     console.log('Could not connect to WebSocketServer');
                     console.log(event);
                     ee.emitEvent('changeFsmState', [st.CONNECTION_FAILED]);
@@ -104,7 +111,10 @@
                     console.log('CLOSED OK');
                 }
             };
+        }
 
+        send(msg) {
+            this.ws.send(msg);
         }
 
         _disconnectedState() {
@@ -173,8 +183,109 @@
                 case st.CONNECTING:
                     this._connectingState();
                     break;
+                case st.DEVICE_DISCONNECTED:
                 case st.CONNECTED:
                     this._connectedState();
+                    break;
+            }
+        }
+    }
+
+    class DeviceMgr {
+        constructor() {
+            this.currentState = 'initial';
+
+            this.angle = document.getElementById('system-input-angle');
+
+            this.kp = document.getElementById('system-input-kp');
+            this.ki = document.getElementById('system-input-ki');
+            this.kd = document.getElementById('system-input-kd');
+
+            this.btnDeviceDisconnected = document.getElementById('btnDeviceDisconnected');
+            this.btnDeviceSend = document.getElementById('btnDeviceSend');
+
+            this.intervalId = undefined;
+        }
+
+        _checkDevice() {
+            console.log('checking for device');
+            ee.emitEvent('checkDevice');
+        }
+
+        _stopChecking() {
+            if (this.intervalId) {
+                clearInterval(this.intervalId);
+            }
+            this.intervalId = undefined;
+        }
+
+        deviceResponse(data) {
+            console.log('device responded');
+            this._stopChecking();
+
+            this.angle.value = data.angle;
+
+            this.kp.value = data.kp;
+            this.ki.value = data.ki;
+            this.kd.value = data.kd;
+
+            ee.emitEvent('changeFsmState', [st.CONNECTED]);
+        }
+
+        _disconnectedState() {
+            this.currentState = st.DISCONNECTED;
+
+            this.angle.value = 0;
+            this.angle.disabled = true;
+
+            this.kp.value = 0;
+            this.kp.disabled = true;
+            this.ki.value = 0;
+            this.ki.disabled = true;
+            this.kd.value = 0;
+            this.kd.disabled = true;
+
+            this.btnDeviceDisconnected.style.display = '';
+            this.btnDeviceSend.style.display = 'none';
+
+            this._stopChecking();
+        }
+
+        _deviceDisconnectedState() {
+            this._disconnectedState();
+            this.currentState = st.DEVICE_DISCONNECTED;
+
+            this.intervalId = setInterval(this._checkDevice, 1000);
+        }
+
+        _connectedState() {
+            this.currentState = st.CONNECTED;
+
+            this.angle.disabled = false;
+
+            this.kp.disabled = false;
+            this.ki.disabled = false;
+            this.kd.disabled = false;
+
+            this.btnDeviceDisconnected.style.display = 'none';
+            this.btnDeviceSend.style.display = '';
+
+            this._stopChecking();
+
+            // TODO: check values ov angle, kp, ki, kd have changed, show that to user and send data to websocketServer
+        }
+
+        changeFsmState(state) {
+            switch(state) {
+                case st.DISCONNECTED:
+                    this._disconnectedState();
+                    break;
+                case st.DEVICE_DISCONNECTED:
+                    this._deviceDisconnectedState();
+                    break;
+                case st.CONNECTED:
+                    this._connectedState();
+                    break;
             }
         }
     }
@@ -194,7 +305,7 @@
             }
         }
 
-        _insertMessage(event) {
+        insertMessage(event) {
             var time = document.createElement('p');
             var timeText = document.createTextNode(new Date(event.ts).toLocaleTimeString());
             time.classList.add('pull-right');
@@ -217,7 +328,7 @@
             this.currentState = st.DISCONNECTED;
 
             this._eraseMessages();
-            this._insertMessage({
+            this.insertMessage({
                 type: '',
                 data: 'Disconnected from WebSocketServer',
                 id: '',
@@ -242,6 +353,7 @@
                 case st.DISCONNECTED:
                     this._disconnectedState();
                     break;
+                case st.DEVICE_DISCONNECTED:
                 case st.CONNECTED:
                     this._connectedState();
                     break;
@@ -302,86 +414,35 @@
 
     var alertMgr = new AlertMgr();
     var wssMgr = new WebSocketServerMgr();
+    var deviceMgr = new DeviceMgr();
     var terminalMgr = new TerminalMgr();
     var pidChart = new MyChart();
     ee.addListener('changeFsmState', (state) => {
         console.log('mudando de estado para ' + state); // TODO: remove this after debug
-        wssMgr.changeFsmState(state);
         alertMgr.changeFsmState(state);
+        wssMgr.changeFsmState(state);
+        deviceMgr.changeFsmState(state);
         terminalMgr.changeFsmState(state);
     });
     ee.emitEvent('changeFsmState', [st.DISCONNECTED]);
 
+    ee.addListener('checkDevice', () => {
+        var msg = {
+            type: 'checkDevice',
+            data: '',
+            id: 'webClient',
+            ts: +Date.now()
+        };
+        wssMgr.send(JSON.stringify(msg));
+    });
+    ee.addListener('deviceResponse', (event) => {
+        deviceMgr.deviceResponse(event.data);
+    });
     ee.addListener('angle', (event) => {
-        terminalMgr._insertMessage(event);
+        terminalMgr.insertMessage(event);
 
         var label = new Date(event.ts).toLocaleTimeString();
         var data = event.data;
-        console.log('-------------')
-        console.log(label);
-        console.log(data);
-        console.log('-------------')
         pidChart.insertData(label, data);
     });
 })();
-
-
-// OLD CODE
-// <script>
- 
-//       // log function
-//       log = function(data){
-//         $("div#terminal").prepend("</br>" +data);
-//         console.log(data);
-//       };
- 
-//       $(document).ready(function () {
-//         $("div#message_details").hide()
- 
-//         var ws;
- 
-//         $("#open").click(function(evt) {
-//           evt.preventDefault();
- 
-//           var host = $("#host").val();
-//           var port = $("#port").val();
-//           var uri = $("#uri").val();
- 
-//           // create websocket instance
-//           ws = new WebSocket("ws://" + host + ":" + port + uri);
-           
-//           // Handle incoming websocket message callback
-//           ws.onmessage = function(evt) {
-//             log("Message Received: " + evt.data)
-//             alert("message received: " + evt.data);
-//             };
- 
-//           // Close Websocket callback
-//           ws.onclose = function(evt) {
-//             log("***Connection Closed***");
-//             alert("Connection close");
-//             $("#host").css("background", "#ff0000"); 
-//             $("#port").css("background", "#ff0000"); 
-//             $("#uri").css("background",  "#ff0000");
-//             $("div#message_details").empty();
- 
-//             };
- 
-//           // Open Websocket callback
-//           ws.onopen = function(evt) { 
-//             $("#host").css("background", "#00ff00"); 
-//             $("#port").css("background", "#00ff00"); 
-//             $("#uri").css("background", "#00ff00");
-//             $("div#message_details").show();
-//             log("***Connection Opened***");
-//           };
-//         });
- 
-//         // Send websocket message function
-//         $("#send").click(function(evt) {
-//             log("Sending Message: "+$("#message").val());
-//             ws.send($("#message").val());
-//         });
- 
-//       });
-//     </script>
