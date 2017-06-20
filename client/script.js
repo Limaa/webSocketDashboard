@@ -22,6 +22,9 @@
             this.msgAlert = document.getElementById('msgAlert');
         }
 
+        // ------------------------------------------------------------------------
+        // Finite State Machine
+        // ------------------------------------------------------------------------
         _disconnectedState() {
             this.currentState = st.DISCONNECTED;
             this.msgAlert.style.display = 'none';
@@ -70,6 +73,9 @@
             this._registerEvents();
         }
 
+        // ------------------------------------------------------------------------
+        // Events
+        // ------------------------------------------------------------------------
         _registerEvents() {
             this.btnConnect.addEventListener('click', () => {
                 ee.emitEvent('changeFsmState', [st.CONNECTING]);
@@ -123,6 +129,9 @@
             this.ws.send(msg);
         }
 
+        // ------------------------------------------------------------------------
+        // Finite State Machine
+        // ------------------------------------------------------------------------
         _disconnectedState() {
             this.currentState = st.DISCONNECTED;
 
@@ -217,6 +226,9 @@
             this._registerEvents();
         }
 
+        // ------------------------------------------------------------------------
+        // Auxiliary Methods
+        // ------------------------------------------------------------------------
         _resetData() {
             console.log(this.deviceData);
             this.angle.value = this.deviceData.angle;
@@ -229,6 +241,20 @@
             this.kd.style.background = '#fff';
         }
 
+        _stopChecking() {
+            if (this.intervalId) {
+                clearInterval(this.intervalId);
+            }
+            this.intervalId = undefined;
+        }
+
+        _inputOnChange(elem, data) {
+            elem.style.background = (parseInt(elem.value) === data ? '#fff' : '#eee');
+        }
+
+        // ------------------------------------------------------------------------
+        // Events
+        // ------------------------------------------------------------------------
         _registerEvents() {
             this.btnDeviceSend.addEventListener('click', () => {
                 ee.emitEvent('btnDeviceSendOnClick');
@@ -259,43 +285,6 @@
             ee.emitEvent('checkDevice');
         }
 
-        _stopChecking() {
-            if (this.intervalId) {
-                clearInterval(this.intervalId);
-            }
-            this.intervalId = undefined;
-        }
-
-        _inputOnChange(elem, data) {
-            elem.style.background = (parseInt(elem.value) === data ? '#fff' : '#eee');
-        }
-
-        updateDeviceData() {
-            this.deviceData = {
-                angle: this.angle.value,
-                kp: this.kp.value,
-                ki: this.ki.value,
-                kd: this.kd.value
-            };
-            this._resetData();
-            return this.deviceData;
-        }
-        inputDeviceAngleOnChange() {
-            this._inputOnChange(this.angle, this.deviceData.angle);
-        }
-        inputDeviceKpOnChange() {
-            this._inputOnChange(this.kp, this.deviceData.kp);
-        }
-        inputDeviceKiOnChange() {
-            this._inputOnChange(this.ki, this.deviceData.ki);
-        }
-        inputDeviceKdOnChange() {
-            this._inputOnChange(this.kd, this.deviceData.kd);
-        }
-        btnDeviceResetOnClick() {
-            this._resetData();
-        }
-
         deviceResponse(data) {
             this._stopChecking();
 
@@ -309,6 +298,40 @@
             ee.emitEvent('changeFsmState', [st.CONNECTED]);
         }
 
+        updateDeviceData() {
+            this.deviceData = {
+                angle: this.angle.value,
+                kp: this.kp.value,
+                ki: this.ki.value,
+                kd: this.kd.value
+            };
+            this._resetData();
+            return this.deviceData;
+        }
+
+        inputDeviceAngleOnChange() {
+            this._inputOnChange(this.angle, this.deviceData.angle);
+        }
+
+        inputDeviceKpOnChange() {
+            this._inputOnChange(this.kp, this.deviceData.kp);
+        }
+
+        inputDeviceKiOnChange() {
+            this._inputOnChange(this.ki, this.deviceData.ki);
+        }
+
+        inputDeviceKdOnChange() {
+            this._inputOnChange(this.kd, this.deviceData.kd);
+        }
+
+        btnDeviceResetOnClick() {
+            this._resetData();
+        }
+
+        // ------------------------------------------------------------------------
+        // Finite State Machine
+        // ------------------------------------------------------------------------
         _disconnectedState() {
             this.currentState = st.DISCONNECTED;
 
@@ -377,6 +400,9 @@
             this.btnSend = document.getElementById('terminal-btn-send');
         }
 
+        // ------------------------------------------------------------------------
+        // Auxiliary Methods
+        // ------------------------------------------------------------------------
         _eraseMessages() {
             while (this.terminalMessages.firstChild) {
                 this.terminalMessages.removeChild(this.terminalMessages.firstChild);
@@ -402,6 +428,9 @@
             this.terminalMessages.scrollTop = this.terminalMessages.scrollHeight;
         }
 
+        // ------------------------------------------------------------------------
+        // Finite State Machine
+        // ------------------------------------------------------------------------
         _disconnectedState() {
             this.currentState = st.DISCONNECTED;
 
