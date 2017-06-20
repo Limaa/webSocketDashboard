@@ -1,9 +1,8 @@
 (function(){
-    "use strict";
+    'use strict';
 
-    const canvasHeight = 60;//120;
+    const canvasHeight = 120; //60;
     const graphLabelSize = 100;
-
     const st = {
         DISCONNECTED: 'disconnected',
         CONNECTING: 'connecting',
@@ -11,9 +10,12 @@
         DEVICE_DISCONNECTED: 'deviceDisconnected',
         CONNECTED: 'connected'
     };
-
     var ee = new EventEmitter();
 
+
+// ------------------------------------------------------------------------
+// CLASSES
+// ------------------------------------------------------------------------
     class AlertMgr {
         constructor() {
             this.currentState = 'initial';
@@ -65,7 +67,9 @@
 
             this.ws = undefined;
 
-            this._registerEvents();        }
+            this._registerEvents();
+        }
+
         _registerEvents() {
             this.btnConnect.addEventListener('click', () => {
                 ee.emitEvent('changeFsmState', [st.CONNECTING]);
@@ -85,14 +89,18 @@
             };
 
             this.ws.onmessage = (event) => {
-                console.log('MESSAGE RECEIVED');
                 try {
                     var data = JSON.parse(event.data);
-                    ee.emitEvent(data.type, [data]);
-                    console.log(data);
+                    switch(data.type) {
+                        case 'devicePong':
+                            ee.emitEvent('deviceResponse', [data]);
+                            break;
+                        default:
+                            ee.emitEvent(data.type, [data]);
+                    }
                 }
                 catch (e) {
-                    console.log('Error parsing message received');
+                    console.log('Error parsing message received. Is the message in JSON format?');
                     console.log(event);
                 }
             };
@@ -101,14 +109,12 @@
             };
 
             this.ws.onclose = (event) => {
-                console.log('Connection with WebSocketServer closed');
                 if (event.code !== 1000) {
-                    console.log('Could not connect to WebSocketServer');
-                    console.log(event);
+                    console.log('Connection with WebSocketServer not possible.');
                     ee.emitEvent('changeFsmState', [st.CONNECTION_FAILED]);
                 }
                 else {
-                    console.log('CLOSED OK');
+                    console.log('Connection with WebSocketServer closed.');
                 }
             };
         }
@@ -137,7 +143,7 @@
         }
 
         _connectingState() {
-            console.log('Trying to connect...');
+            console.log('Trying to connect to WebSocketServer.');
             this.currentState = st.CONNECTING;
 
             this.btnConnect.style.display = 'none';
@@ -200,15 +206,56 @@
             this.kp = document.getElementById('system-input-kp');
             this.ki = document.getElementById('system-input-ki');
             this.kd = document.getElementById('system-input-kd');
+            this.deviceData = undefined;
 
             this.btnDeviceDisconnected = document.getElementById('btnDeviceDisconnected');
             this.btnDeviceSend = document.getElementById('btnDeviceSend');
+            this.btnDeviceReset = document.getElementById('btnDeviceReset');
 
             this.intervalId = undefined;
+
+            this._registerEvents();
+        }
+
+        _resetData() {
+            console.log(this.deviceData);
+            this.angle.value = this.deviceData.angle;
+            this.angle.style.background = '#fff';
+            this.kp.value = this.deviceData.kp;
+            this.kp.style.background = '#fff';
+            this.ki.value = this.deviceData.ki;
+            this.ki.style.background = '#fff';
+            this.kd.value = this.deviceData.kd;
+            this.kd.style.background = '#fff';
+        }
+
+        _registerEvents() {
+            this.btnDeviceSend.addEventListener('click', () => {
+                ee.emitEvent('btnDeviceSendOnClick');
+            });
+
+            this.angle.addEventListener('change', () => {
+                ee.emitEvent('inputDeviceAngleOnChange');
+            });
+
+            this.kp.addEventListener('change', () => {
+                ee.emitEvent('inputDeviceKpOnChange');
+            });
+
+            this.ki.addEventListener('change', () => {
+                ee.emitEvent('inputDeviceKiOnChange');
+            });
+
+            this.kd.addEventListener('change', () => {
+                ee.emitEvent('inputDeviceKdOnChange');
+            });
+
+            this.btnDeviceReset.addEventListener('click', () => {
+                ee.emitEvent('btnDeviceResetOnClick');
+            });
         }
 
         _checkDevice() {
-            console.log('checking for device');
             ee.emitEvent('checkDevice');
         }
 
@@ -219,8 +266,37 @@
             this.intervalId = undefined;
         }
 
+        _inputOnChange(elem, data) {
+            elem.style.background = (parseInt(elem.value) === data ? '#fff' : '#eee');
+        }
+
+        updateDeviceData() {
+            this.deviceData = {
+                angle: this.angle.value,
+                kp: this.kp.value,
+                ki: this.ki.value,
+                kd: this.kd.value
+            };
+            this._resetData();
+            return this.deviceData;
+        }
+        inputDeviceAngleOnChange() {
+            this._inputOnChange(this.angle, this.deviceData.angle);
+        }
+        inputDeviceKpOnChange() {
+            this._inputOnChange(this.kp, this.deviceData.kp);
+        }
+        inputDeviceKiOnChange() {
+            this._inputOnChange(this.ki, this.deviceData.ki);
+        }
+        inputDeviceKdOnChange() {
+            this._inputOnChange(this.kd, this.deviceData.kd);
+        }
+        btnDeviceResetOnClick() {
+            this._resetData();
+        }
+
         deviceResponse(data) {
-            console.log('device responded');
             this._stopChecking();
 
             this.angle.value = data.angle;
@@ -228,6 +304,7 @@
             this.kp.value = data.kp;
             this.ki.value = data.ki;
             this.kd.value = data.kd;
+            this.deviceData = data;
 
             ee.emitEvent('changeFsmState', [st.CONNECTED]);
         }
@@ -247,6 +324,7 @@
 
             this.btnDeviceDisconnected.style.display = '';
             this.btnDeviceSend.style.display = 'none';
+            this.btnDeviceReset.style.display = 'none';
 
             this._stopChecking();
         }
@@ -269,14 +347,14 @@
 
             this.btnDeviceDisconnected.style.display = 'none';
             this.btnDeviceSend.style.display = '';
+            this.btnDeviceReset.style.display = '';
 
             this._stopChecking();
-
-            // TODO: check values ov angle, kp, ki, kd have changed, show that to user and send data to websocketServer
         }
 
         changeFsmState(state) {
             switch(state) {
+                case st.CONNECTION_FAILED:
                 case st.DISCONNECTED:
                     this._disconnectedState();
                     break;
@@ -412,13 +490,16 @@
         }
     }
 
+
+// ------------------------------------------------------------------------
+// MAIN
+// ------------------------------------------------------------------------
     var alertMgr = new AlertMgr();
     var wssMgr = new WebSocketServerMgr();
     var deviceMgr = new DeviceMgr();
     var terminalMgr = new TerminalMgr();
     var pidChart = new MyChart();
     ee.addListener('changeFsmState', (state) => {
-        console.log('mudando de estado para ' + state); // TODO: remove this after debug
         alertMgr.changeFsmState(state);
         wssMgr.changeFsmState(state);
         deviceMgr.changeFsmState(state);
@@ -426,9 +507,13 @@
     });
     ee.emitEvent('changeFsmState', [st.DISCONNECTED]);
 
+
+    // ------------------------------------------------------------------------
+    // DEVICE
+    // ------------------------------------------------------------------------
     ee.addListener('checkDevice', () => {
         var msg = {
-            type: 'checkDevice',
+            type: 'devicePing',
             data: '',
             id: 'webClient',
             ts: +Date.now()
@@ -438,6 +523,38 @@
     ee.addListener('deviceResponse', (event) => {
         deviceMgr.deviceResponse(event.data);
     });
+
+    ee.addListener('btnDeviceSendOnClick', () => {
+        var data = deviceMgr.updateDeviceData();
+
+        var msg = {
+            type: 'deviceData',
+            data: data,
+            id: 'webClient',
+            ts: Date.now()
+        };
+        wssMgr.send(JSON.stringify(msg));
+    });
+    ee.addListener('inputDeviceAngleOnChange', () => {
+        deviceMgr.inputDeviceAngleOnChange();
+    });
+    ee.addListener('inputDeviceKpOnChange', () => {
+        deviceMgr.inputDeviceKpOnChange();
+    });
+    ee.addListener('inputDeviceKiOnChange', () => {
+        deviceMgr.inputDeviceKiOnChange();
+    });
+    ee.addListener('inputDeviceKdOnChange', () => {
+        deviceMgr.inputDeviceKdOnChange();
+    });
+    ee.addListener('btnDeviceResetOnClick', () => {
+        deviceMgr.btnDeviceResetOnClick();
+    });
+
+
+    // ------------------------------------------------------------------------
+    // Chart
+    // ------------------------------------------------------------------------
     ee.addListener('angle', (event) => {
         terminalMgr.insertMessage(event);
 

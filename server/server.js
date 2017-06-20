@@ -36,7 +36,7 @@
         setTimeout(() => {
             console.log('sending DEVICE response');
             var msg = {
-                type: 'deviceResponse',
+                type: 'devicePong',
                 data: {
                     angle: 46,
                     kp: 3,
