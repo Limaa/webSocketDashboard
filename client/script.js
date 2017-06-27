@@ -3,6 +3,7 @@
 
     const canvasHeight = 120; //60;
     const graphLabelSize = 100;
+    const terminalMaxMessages = 50;
     const st = {
         DISCONNECTED: 'disconnected',
         CONNECTING: 'connecting',
@@ -106,8 +107,8 @@
                     }
                 }
                 catch (e) {
-                    console.log('Error parsing message received. Is the message in JSON format?');
-                    console.log(event);
+                    console.error('Error parsing message received. Is the message in JSON format?');
+                    console.error(event);
                 }
             };
 
@@ -260,19 +261,19 @@
                 ee.emitEvent('btnDeviceSendOnClick');
             });
 
-            this.angle.addEventListener('change', () => {
+            this.angle.addEventListener('input', () => {
                 ee.emitEvent('inputDeviceAngleOnChange');
             });
 
-            this.kp.addEventListener('change', () => {
+            this.kp.addEventListener('input', () => {
                 ee.emitEvent('inputDeviceKpOnChange');
             });
 
-            this.ki.addEventListener('change', () => {
+            this.ki.addEventListener('input', () => {
                 ee.emitEvent('inputDeviceKiOnChange');
             });
 
-            this.kd.addEventListener('change', () => {
+            this.kd.addEventListener('input', () => {
                 ee.emitEvent('inputDeviceKdOnChange');
             });
 
@@ -396,8 +397,11 @@
             this.currentState = 'initial';
 
             this.terminalMessages = document.getElementById('terminal-messages');
-            this.inputInfo = document.getElementById('terminal-input-info');
-            this.btnSend = document.getElementById('terminal-btn-send');
+            this.inputTerminalText = document.getElementById('terminal-input-info');
+            this.btnTerminalSend = document.getElementById('terminal-btn-send');
+
+            this.oldInputTerminalText = '';
+            this._registerEvents();
         }
 
         // ------------------------------------------------------------------------
@@ -410,6 +414,10 @@
         }
 
         insertMessage(event) {
+            if (this.terminalMessages.childElementCount > terminalMaxMessages) {
+                this.terminalMessages.removeChild(this.terminalMessages.firstChild);
+            }
+
             var time = document.createElement('p');
             var timeText = document.createTextNode(new Date(event.ts).toLocaleTimeString());
             time.classList.add('pull-right');
@@ -429,6 +437,53 @@
         }
 
         // ------------------------------------------------------------------------
+        // Events
+        // ------------------------------------------------------------------------
+        _registerEvents() {
+            this.inputTerminalText.addEventListener('focus', () => {
+                ee.emitEvent('inputTerminalTextOnFocus');
+            });
+
+            this.inputTerminalText.addEventListener('blur', () => {
+                ee.emitEvent('inputTerminalTextOnBlur');
+            });
+
+            this.inputTerminalText.addEventListener('keypress', (event) => {
+                ee.emitEvent('inputTerminalTextOnKeyPress', [event]);
+            });
+
+            this.btnTerminalSend.addEventListener('click', () => {
+                ee.emitEvent('btnTerminalSendOnClick');
+            });
+        }
+
+        inputTerminalTextOnFocus() {
+            this.inputTerminalText.value = 'webClient:terminal:';
+        }
+
+        inputTerminalTextOnBlur() {
+            this.oldInputTerminalText = this.inputTerminalText.value;
+            setTimeout(() => {
+                this.oldInputTerminalText = '';
+            }, 500);
+            this.inputTerminalText.value = '';
+        }
+
+        btnTerminalSendOnClick() {
+            if (this.inputTerminalText.value !== '') {
+                ee.emitEvent('terminalSendMessage', [this.inputTerminalText.value]);
+            } else if (this.oldInputTerminalText !== '') {
+                ee.emitEvent('terminalSendMessage', [this.oldInputTerminalText]);
+            }
+            this.inputTerminalText.value = '';
+        }
+
+        inputTerminalTextOnKeyPress(event) {
+            if (event.keyCode === 13) {
+                ee.emitEvent('btnTerminalSendOnClick');
+            }
+        }
+        // ------------------------------------------------------------------------
         // Finite State Machine
         // ------------------------------------------------------------------------
         _disconnectedState() {
@@ -442,8 +497,8 @@
                 ts: +Date.now()
             });
 
-            this.inputInfo.disabled = true;
-            this.btnSend.classList.add('disabled');
+            this.inputTerminalText.disabled = true;
+            this.btnTerminalSend.classList.add('disabled');
         }
 
         _connectedState() {
@@ -451,8 +506,8 @@
 
             this._eraseMessages();
 
-            this.inputInfo.disabled = false;
-            this.btnSend.classList.remove('disabled');
+            this.inputTerminalText.disabled = false;
+            this.btnTerminalSend.classList.remove('disabled');
         }
 
         changeFsmState(state) {
@@ -580,6 +635,31 @@
         deviceMgr.btnDeviceResetOnClick();
     });
 
+    // ------------------------------------------------------------------------
+    // Terminal
+    // ------------------------------------------------------------------------
+    ee.addListener('inputTerminalTextOnFocus', () => {
+        terminalMgr.inputTerminalTextOnFocus();
+    });
+    ee.addListener('inputTerminalTextOnBlur', () => {
+        terminalMgr.inputTerminalTextOnBlur();
+    });
+    ee.addListener('inputTerminalTextOnKeyPress', (event) => {
+        terminalMgr.inputTerminalTextOnKeyPress(event);
+    });
+    ee.addListener('btnTerminalSendOnClick', () => {
+        terminalMgr.btnTerminalSendOnClick();
+    });
+    ee.addListener('terminalSendMessage', (info) => {
+        info = info.split(':');
+        var msg = {
+            id: info[0],
+            type: info[1],
+            data: info[2],
+            ts: Date.now()
+        };
+        wssMgr.send(JSON.stringify(msg));
+    });
 
     // ------------------------------------------------------------------------
     // Chart

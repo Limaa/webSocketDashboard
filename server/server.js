@@ -23,7 +23,12 @@
             console.log('Message received: %s', message);
             var reversedMessage = message.split('').reverse().join('');
             console.log('Sending back: %s', reversedMessage);
-            ws.send(reversedMessage);
+            try {
+                ws.send(reversedMessage);
+            }
+            catch (e) {
+                console.error(e);
+            }
         });
 
         // Connection close
@@ -77,7 +82,12 @@
                 };
                 msg = JSON.stringify(msg);
             }
-            ws.send(msg);
+            try {
+                ws.send(msg);
+            }
+            catch (e) {
+                console.error(e);
+            }
         });
     }
 // DEVICE SIMULATION ----------------------------------------
