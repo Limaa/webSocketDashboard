@@ -103,6 +103,7 @@
                             ee.emitEvent('deviceResponse', [data]);
                             break;
                         default:
+                            console.log('Message received: '+data.type);
                             ee.emitEvent(data.type, [data]);
                     }
                 }
@@ -536,8 +537,16 @@
                 type: 'line',
                 data: data,
                 options: {
-                    animation: false
-                }
+                    animation: false,
+                    scales: {
+                        yAxes: [{
+                            ticks: {
+                                suggestedMin: -90,
+                                suggestedMax: 90
+                            }
+                        }]
+                    }
+                },
             };
 
             this.canvasId = obj.canvasId;
