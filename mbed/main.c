@@ -19,14 +19,17 @@ int main() {
     while (!ws.connect());
     printf("Connected to WebSocketServer\r\n");
 
+    printf("Motor initialization...\n");
     pwmInit();
-
-    RtosTimer accelerometerTimer(readAccel);
-    accelerometerTimer.start(SAMPLE_PERIOD);
 
     t1.start(callback(handleIncomingWebSocketData, &ws));
     t2.start(callback(handleOutgoingWebSocketData, &ws));
     t3.start(pwmOut);
+
+    RtosTimer accelerometerTimer(readAccel);
+    accelerometerTimer.start(SAMPLE_PERIOD);
+
+    pidThread.start(callback(PID, &mDat));
     // int s = 0;
 
     while (true) {

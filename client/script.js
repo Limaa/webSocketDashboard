@@ -103,7 +103,7 @@
                             ee.emitEvent('deviceResponse', [data]);
                             break;
                         default:
-                            console.log('Message received: '+data.type);
+                            // console.log('Message received: '+data.type);
                             ee.emitEvent(data.type, [data]);
                     }
                 }
@@ -674,7 +674,7 @@
     // Chart
     // ------------------------------------------------------------------------
     ee.addListener('angle', (event) => {
-        terminalMgr.insertMessage(event);
+        // terminalMgr.insertMessage(event);
 
         var label = new Date(event.ts).toLocaleTimeString();
         var data = event.data;
